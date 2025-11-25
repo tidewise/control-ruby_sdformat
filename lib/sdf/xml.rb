@@ -60,6 +60,20 @@ module SDF
 
         # Load the SDF from a gazebo model
         #
+        # ruby_sdformat supports two modes to load a SDF model. If `flatten` is false,
+        # the XML returned keeps the whole model hierarchy, and for instance a Model
+        # can have a Model as child. If `flatten` is true, the same processing that
+        # is done by gazebo is applied. `<include>` actually takes the content of
+        # the included model and inserts it in the including model. This requires
+        # prefixing names from the included model by the model name itself (e.g.
+        # `imu` becomes `includedmodelname::imu`), and also some other transformations
+        # regarding poses. This is all done automatically
+        #
+        # Given that plugins can't be processed automatically, the transformation
+        # also adds a new 'scope' attribute to plugin elements so that the plugin
+        # code can internally do this transformation. The scope is the full name
+        # of the element containing the plugin
+        #
         # @param [String] dir the path to the model directory
         # @!macro sdf_version
         # @raise [Errno::ENOENT] if the files does not exist
@@ -398,7 +412,38 @@ module SDF
         # Unlike {.load_sdf_raw}, this resolves the include tags in the XML
         # representation
         #
+        # ## Flatten
+        #
+        # ruby_sdformat supports two modes to load a SDF model. If `flatten` is false,
+        # the XML returned keeps the whole model hierarchy, and for instance a Model
+        # can have a Model as child. If `flatten` is true, the same processing that
+        # is done by gazebo is applied. `<include>` actually takes the content of
+        # the included model and inserts it in the including model. This requires
+        # prefixing names from the included model by the model name itself (e.g.
+        # `imu` becomes `includedmodelname::imu`), and also some other transformations
+        # regarding poses. This is all done automatically
+        #
+        # Given that plugins can't be processed automatically, the transformation
+        # also adds a new 'scope' attribute to plugin elements so that the plugin
+        # code can internally do this transformation. The scope is the full name
+        # of the element containing the plugin
+        #
+        # ## Metadata
+        #
+        # The 'metadata' flag instructs the function to return a metadata hash in
+        # adddition to the XML tree. This hash contains an 'includes' entry which
+        # is a list of [uri, path] pairs, where `uri` is the URI of the model that
+        # has been included and `path` the gazebo path (of the form `a::b::c`) in
+        # the generated XML tree where `uri` was inserted
+        #
         # @param [String] sdf_file the path to the SDF file
+        # @param [Boolean] flatten flattens the XML model or not (see above)
+        # @param [Boolean] metadata whether the method should return a metadata hash
+        #   about the various inclusions that have been performed. See above for
+        #   the hash format
+        # @return [REXML::Element,(REXML::Element,Hash)] either the XML tree by itself
+        #   if `metadata` is false, or the pair of the tree and the metadata hash
+        #   otherwise.
         # @raise [Errno::ENOENT] if the files does not exist
         # @raise [NotSDF] if the file is not a SDF file
         # @raise [InvalidXML] if the file is not a valid XML file
@@ -461,6 +506,18 @@ module SDF
             end
         end
 
+        # Applies the name and pose mappings necessary to resolve model inclusion
+        #
+        # ruby_sdformat supports two loading modes
+        # the usage of SDF models to describe the robots kinematic chains and
+        # sensors. This requires using the hierarchical structure of `include` tags
+        # instead of "flattening" it as gazebo expects. Among the things that need
+        # transforming are all the references to other objects (e.g. a link name
+        # needs to be scoped according to the flattened hierarchy)
+        #
+        # This process is done by ruby_sdformat for all
+        #
+        # While ruby_sdformat does the work
         def self.transform_submodel_nodes(submodel, basename)
             new = []
             model_pose = nil
