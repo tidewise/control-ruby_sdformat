@@ -76,7 +76,7 @@ module SDF
             end
 
             @models.each_value do |m|
-                m.canonical_link = @canonical_link
+                m.canonical_link ||= @canonical_link
             end
             @direct_joints = direct_joints.transform_values do |joint_xml|
                 Joint.new(joint_xml, self)
