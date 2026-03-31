@@ -93,7 +93,8 @@ module SDF
                 "model" => Model,
                 "sdf" => Root,
                 "link" => Link,
-                "joint" => Joint]
+                "joint" => Joint,
+                "plugin" => Plugin]
 
             if (klass = xml_to_class[xml.name])
                 return klass.new(xml, parent)

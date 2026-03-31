@@ -28,5 +28,23 @@ module SDF
                 assert_nil sensor.update_period
             end
         end
+
+        describe "#each_plugin" do
+            it "does not yield anything if the sensor has no plugin" do
+                root = SDF::Sensor.new(REXML::Document.new("<sensor />").root)
+                assert root.enum_for(:each_plugin).to_a.empty?
+            end
+            it "yields the plugins otherwise" do
+                root = SDF::Sensor.new(REXML::Document.new("<sensor><plugin name=\"0\" /><plugin name=\"1\" /></sensor>").root)
+
+                plugin = root.enum_for(:each_plugin).to_a
+                assert_equal 2, plugin.size
+                plugin.each do |l|
+                    assert_kind_of SDF::Plugin, l
+                    assert_same root, l.parent
+                    assert_equal root.xml.elements.to_a("plugin[@name=\"#{l.name}\"]"), [l.xml]
+                end
+            end
+        end
     end
 end

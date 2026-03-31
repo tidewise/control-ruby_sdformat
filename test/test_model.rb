@@ -61,6 +61,32 @@ describe SDF::Model do
         end
     end
 
+    describe "#find_model_by_name" do
+        before do
+            xml_s = <<~XML
+                <model>
+                    <model name="0"><model name="a" /></model>
+                    <model name="1" />
+                </model>
+            XML
+            @xml = REXML::Document.new(xml_s).root
+            @root = SDF::Model.new(@xml)
+        end
+        it "returns nil if the model has no " do
+            assert_nil @root.find_model_by_name("does_not_exist")
+        end
+        it "returns a direct model" do
+            model = @root.find_model_by_name("1")
+            assert_kind_of SDF::Model, model
+            assert_equal @xml.elements["model[@name=\"1\"]"], model.xml
+        end
+        it "returns models recursively" do
+            model = @root.find_model_by_name("0::a")
+            assert_kind_of SDF::Model, model
+            assert_equal @xml.elements["//model[@name=\"a\"]"], model.xml
+        end
+    end
+
     describe "#each_model" do
         it "does not yield anything if the model has no models" do
             root = SDF::Model.new(REXML::Document.new("<model></model>").root)
