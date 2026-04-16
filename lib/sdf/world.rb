@@ -16,10 +16,19 @@ module SDF
 
         xml_tag_name "world"
 
+        def find_model_by_name(name)
+            each_model.find { |m| m.name == name }
+        end
+
+        # @deprecated use {#each_direct_model} instead
+        def each_model(&block)
+            each_direct_model(&block)
+        end
+
         # Enumerates the models from this world
         #
         # @yieldparam [Model] model
-        def each_model
+        def each_direct_model
             return enum_for(__method__) unless block_given?
 
             xml.elements.each do |element|
@@ -38,8 +47,15 @@ module SDF
             )
         end
 
+        # @deprecated use {#each_direct_plugin} instead
+        def each_plugin(&block)
+            each_direct_plugin(&block)
+        end
+
         # Enumerate the world-level plugins
-        def each_plugin
+        #
+        # @yieldparam [Plugin]
+        def each_direct_plugin
             return enum_for(__method__) unless block_given?
 
             xml.elements.each do |element|

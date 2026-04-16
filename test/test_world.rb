@@ -20,6 +20,17 @@ module SDF
                 end
             end
         end
+        describe "#find_model_by_name" do
+            it "returns nil if the model does not exist" do
+                root = SDF::World.new(REXML::Document.new("<world><model name=\"0\" /><model name=\"1\" /></world>").root)
+                assert_nil root.find_model_by_name("does_not_exist")
+            end
+            it "yields the models otherwise" do
+                xml = REXML::Document.new("<world><model name=\"0\" /><model name=\"1\" /></world>").root
+                world = SDF::World.new(xml)
+                assert_equal xml.elements["model[@name=\"1\"]"], world.find_model_by_name("1").xml
+            end
+        end
         describe ".empty" do
             it "creates a world with no models" do
                 world = World.empty(name: "test")

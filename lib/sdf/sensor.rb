@@ -18,6 +18,16 @@ module SDF
             @sensor_info = xml.elements[type]
         end
 
+        def each_direct_plugin(&block)
+            each_plugin(&block)
+        end
+
+        def each_plugin
+            xml.elements.each do |plugin_xml|
+                yield(Plugin.new(plugin_xml, self))
+            end
+        end
+
         # The sensor type
         def type
             xml.attributes["type"]

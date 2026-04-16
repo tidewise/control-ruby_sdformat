@@ -87,6 +87,10 @@ module SDF
         # The link that is used to represent the pose of the model itself
         attr_accessor :canonical_link
 
+        def find_model_by_name(name)
+            @models[name]
+        end
+
         # (see Element#find_by_name)
         def find_by_name(name)
             @models[name] || @links[name] || @joints[name]
