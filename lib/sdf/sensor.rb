@@ -23,7 +23,7 @@ module SDF
         end
 
         def each_plugin
-            xml.elements.each do |plugin_xml|
+            xml.elements.to_a("plugin").each do |plugin_xml|
                 yield(Plugin.new(plugin_xml, self))
             end
         end
