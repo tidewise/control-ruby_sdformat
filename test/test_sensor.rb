@@ -34,6 +34,10 @@ module SDF
                 root = SDF::Sensor.new(REXML::Document.new("<sensor />").root)
                 assert root.enum_for(:each_plugin).to_a.empty?
             end
+            it "does not yield non-plugin children" do
+                root = SDF::Sensor.new(REXML::Document.new("<sensor><pose /></sensor>").root)
+                assert root.enum_for(:each_plugin).to_a.empty?
+            end
             it "yields the plugins otherwise" do
                 root = SDF::Sensor.new(REXML::Document.new("<sensor><plugin name=\"0\" /><plugin name=\"1\" /></sensor>").root)
 
