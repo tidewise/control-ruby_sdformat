@@ -226,7 +226,7 @@ module SDF
         # @raise (see model_path_of)
         # @raise [NoSuchModel] if the provided model name does not resolve to a
         #   model in {model_path}
-        # @return [REXML::Element]
+        # @return [String] the path to the SDF file for the model
         def self.model_path_from_name(model_name, model_path: @model_path, sdf_version: nil)
             @gazebo_models[sdf_version] ||= {}
             cache = (@gazebo_models[sdf_version][model_name] ||= ModelCacheEntry.new)
@@ -282,6 +282,23 @@ module SDF
             end
         end
 
+        # Resolves relative paths and model:// URIs in the XML tree in-place
+        #
+        # This method traverses the XML tree starting from the given node, and
+        # expands any relative paths or `model://` URIs inside `<uri>` tags to
+        # absolute paths on the local filesystem.
+        #
+        # It skips `<include>` tags because those are resolved separately during
+        # {.add_include_tags}.
+        #
+        # @example Replaces a model:// mesh path:
+        #   # Before: <uri>model://robot_model/hull.dae</uri>
+        #   # After:  <uri>/path/to/workspace/robot_models/models/sdf/robot_model/hull.dae</uri>
+        #
+        # @param [REXML::Element] node the XML element to traverse
+        # @!macro sdf_version
+        # @param [String] base_path the base directory path used to resolve relative paths
+        # @return [void]
         def self.resolve_relative_uris(node, sdf_version, base_path)
             nodes = [node]
             until nodes.empty?
@@ -332,6 +349,24 @@ module SDF
         #
         # This method modifies the XML tree by replacing the include tags found
         # as direct children of the provided element by the included content.
+        #
+        # @example
+        #   # Before calling add_include_tags:
+        #   # <world name="my_world">
+        #   #   <include>
+        #   #     <uri>model://my_sensor</uri>
+        #   #     <name>custom_sensor</name>
+        #   #     <pose>1 0 0 0 0 0</pose>
+        #   #   </include>
+        #   # </world>
+        #   #
+        #   # After calling add_include_tags:
+        #   # <world name="my_world">
+        #   #   <model name="custom_sensor">
+        #   #     <pose>1 0 0 0 0 0</pose>
+        #   #     <link name="sensor_link">...</link>
+        #   #   </model>
+        #   # </world>
         #
         # @param [REXML::Element] elem element to find include tags
         # @!macro sdf_version
