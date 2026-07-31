@@ -60,7 +60,7 @@ describe SDF::XML do
     describe "gazebo_models" do
         it "loads all models available in the path" do
             models = SDF::XML.gazebo_models
-            assert_equal 23, models.size
+            assert_equal 24, models.size
 
             assert(sdf = models["simple_model"])
             model = sdf.elements.enum_for(:each, "sdf/model").first
@@ -398,6 +398,19 @@ describe SDF::XML do
                     assert_equal "name", model.attributes["name"]
                 end
             end
+        end
+    end
+
+    describe "load_sdf with a ERB templated model" do
+        it "loads SDF file fallbacks to ERB when model.sdf doesn't exist" do
+            sdf = SDF::XML.load_sdf_raw(File.join(models_dir, "simple_model_erb", "model.sdf"))
+            model = sdf.elements.enum_for(:each, "sdf/model").first
+            assert_equal("simple_model_erb", model.attributes["name"])
+        end
+        it "loads ERB templated file" do
+            sdf = SDF::XML.load_sdf_raw(File.join(models_dir, "simple_model_erb", "model.sdf.erb"))
+            model = sdf.elements.enum_for(:each, "sdf/model").first
+            assert_equal("simple_model_erb", model.attributes["name"])
         end
     end
 

@@ -1,4 +1,5 @@
 require "rexml/document"
+require_relative "erb"
 
 module SDF
     module XML
@@ -406,24 +407,38 @@ module SDF
         # @raise [Errno::ENOENT] if the files does not exist
         # @raise [NotSDF] if the file is not a SDF file
         # @raise [InvalidXML] if the file is not a valid XML file
+        # @raise [NoSuchModel] if cannot opend sdf_file nor a erb templated sdf_file
         # @return [REXML::Element]
         def self.load_sdf_raw(sdf_file)
-            sdf = File.open(sdf_file) do |io|
-                REXML::Document.new(io)
+            erb_file = sdf_file.end_with?(".erb") ? sdf_file : "#{sdf_file}.erb"
+
+            unless File.exist?(sdf_file) || File.exist?(erb_file)
+                file_name  = File.basename(sdf_file)
+                dir_path   = File.dirname(sdf_file)
+                raise Errno::ENOENT,
+                      "Cannot find '#{file_name}' or '#{file_name}.erb' in '#{dir_path}'. " \
+                      "You probably want to update the GAZEBO_MODEL_PATH environment variable, " \
+                      "or set SDF.model_path explicitly."
+            end
+
+            begin
+                sdf = if File.exist?(sdf_file) && !sdf_file.end_with?(".erb")
+                          File.open(sdf_file) { |io| REXML::Document.new(io) }
+                      else
+                          REXML::Document.new(SDF::ERB.parse_erb_as_str(SDF::ERB.read_erb_file(erb_file)))
+                      end
             rescue REXML::ParseException => e
-                unless e.message.match?(/No root/)
-                    raise InvalidXML, "cannot load #{sdf_file}: #{e.message}"
+                unless e.message.include?("No root")
+                    raise InvalidXML, "Cannot load #{sdf_file}: #{e.message}"
                 end
 
-                REXML::Document.new
+                sdf = REXML::Document.new
             end
 
             unless sdf.root
-                raise NotSDF,
-                      "#{sdf_file} can be parsed as an XML file, but it does not have a root"
+                raise NotSDF, "#{sdf_file} can be parsed as an XML file, but it does not have a root"
             end
-
-            if sdf.root.name != "sdf" && sdf.root.name != "gazebo"
+            unless %w[sdf gazebo].include?(sdf.root.name)
                 raise NotSDF, "#{sdf_file} is not a SDF file"
             end
 
