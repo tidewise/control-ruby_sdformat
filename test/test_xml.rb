@@ -169,10 +169,12 @@ describe SDF::XML do
                     sdf = SDF::XML.load_sdf(File.join(models_dir,
                                                       "model_with_relative_file_in_uri", "model.sdf"))
                     uri = sdf.elements.to_a("//uri").first
-                    assert_equal(
-                        File.join(models_dir, "model_with_relative_file_in_uri",
-                                  "visual.dae"), uri.text
+                    expected_full_path = File.expand_path(
+                        File.join(
+                            models_dir, "model_with_relative_file_in_uri", "visual.dae"
+                        )
                     )
+                    assert_equal(expected_full_path, uri.text)
                 end
                 it "resolves relative paths to other model's paths in <uri> tags" do
                     sdf = SDF::XML.load_sdf(File.join(models_dir,
@@ -184,10 +186,10 @@ describe SDF::XML do
                     sdf = SDF::XML.load_sdf(File.join(models_dir,
                                                       "model_that_includes_a_model_with_relative_paths", "model.sdf"))
                     uri = sdf.elements.to_a("//uri").first
-                    assert_equal(
-                        File.join(models_dir, "model_with_relative_uris",
-                                  "visual.dae"), uri.text
+                    expected_full_path = File.expand_path(
+                        File.join(models_dir, "model_with_relative_uris", "visual.dae")
                     )
+                    assert_equal(expected_full_path, uri.text)
                 end
                 it "resolves model:// in <uri> tags" do
                     sdf = SDF::XML.load_sdf(File.join(models_dir,
@@ -204,9 +206,9 @@ describe SDF::XML do
                     metadata: true
                 )
 
-                model_full_path = File.expand_path(File.join(
-                                                       "data", "models", "simple_model", "model.sdf"
-                                                   ), __dir__)
+                model_full_path = File.join(
+                    models_dir, "simple_model", "model.sdf"
+                )
                 expected = [
                     "w::child_of_world",
                     "w::model::child_of_model",
@@ -214,7 +216,6 @@ describe SDF::XML do
                     "root_model::child_of_root_model",
                     "root_model::model_in_root_model::child_of_model_in_root_model"
                 ]
-
                 assert_equal [model_full_path], metadata["includes"].keys
                 assert_equal expected.sort,
                              metadata["includes"][model_full_path].sort
@@ -227,12 +228,10 @@ describe SDF::XML do
                     metadata: true
                 )
 
-                ur10_full_path = File.expand_path(File.join(
-                                                      "data", "regressions", "ur10", "ur10.sdf"
-                                                  ), __dir__)
-                dual_ur10_full_path = File.expand_path(File.join(
-                                                           "data", "regressions", "dual_ur10", "model.sdf"
-                                                       ), __dir__)
+                ur10_full_path = File.join(regressions_dir, "ur10", "ur10.sdf")
+                dual_ur10_full_path = File.join(
+                    regressions_dir, "dual_ur10", "model.sdf"
+                )
                 expected = Hash[
                     ur10_full_path => %w[
                         empty_world::dual_ur10_fixed::dual_ur10::left_arm
