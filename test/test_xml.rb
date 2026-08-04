@@ -426,6 +426,52 @@ describe SDF::XML do
             model = sdf2.elements.enum_for(:each, "sdf/model").first
             assert_equal("versioned model 1.3", model.attributes["name"])
         end
+
+        describe "in-memory registration and caching" do
+            before do
+                # Clear the gazebo models cache before each test
+                SDF::XML.instance_variable_get(:@gazebo_models).clear
+            end
+
+            it "allows registering a model as a REXML::Document" do
+                refute SDF::XML.cached_model?("virtual_model")
+
+                doc = REXML::Document.new("<model name='virtual'><link name='base'/></model>")
+                SDF::XML.register_in_memory_model("virtual_model", doc)
+
+                assert SDF::XML.cached_model?("virtual_model")
+                assert_equal doc, SDF::XML.model_from_name("virtual_model", flatten: false)
+            end
+
+            it "allows registering a model as a REXML::Element" do
+                refute SDF::XML.cached_model?("virtual_el")
+
+                element = REXML::Element.new("model")
+                element.add_attribute("name", "virtual")
+                SDF::XML.register_in_memory_model("virtual_el", element)
+
+                assert SDF::XML.cached_model?("virtual_el")
+                loaded = SDF::XML.model_from_name("virtual_el", flatten: false)
+                assert_equal element, loaded.root
+            end
+
+            it "allows registering a model as a raw XML String" do
+                refute SDF::XML.cached_model?("virtual_str")
+
+                xml_string = "<model name='virtual'><link name='base'/></model>"
+                SDF::XML.register_in_memory_model("virtual_str", xml_string)
+
+                assert SDF::XML.cached_model?("virtual_str")
+                loaded = SDF::XML.model_from_name("virtual_str", flatten: false)
+                assert_equal "virtual", loaded.root.attributes["name"]
+            end
+
+            it "raises ArgumentError when registering an invalid type" do
+                assert_raises(ArgumentError) do
+                    SDF::XML.register_in_memory_model("invalid_model", 12_345)
+                end
+            end
+        end
         it "raises if the model cannot be found" do
             exception = assert_raises(SDF::XML::NoSuchModel) do
                 SDF::XML.model_from_name("does_not_exist")

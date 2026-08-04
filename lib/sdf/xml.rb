@@ -39,8 +39,11 @@ module SDF
         # @param [Array<String>] path list of directories in which we should
         #   search for models
         def self.model_path=(path)
-            @model_path = Array(path)
-            clear_cache
+            new_path = Array(path)
+            if @model_path != new_path
+                @model_path = new_path
+                clear_cache
+            end
         end
 
         # load model_path with default parameters
@@ -157,6 +160,63 @@ module SDF
         end
 
         ModelCacheEntry = Struct.new :path, :xml, :metadata
+
+        # Registers an in-memory XML model in the cache to avoid disk lookup
+        #
+        # @param [String] model_name the target name in the cache
+        # @param [REXML::Document,REXML::Element,String] xml_doc the XML model representation
+        def self.register_in_memory_model(model_name, xml_doc, sdf_version: nil)
+            xml = case xml_doc
+                  when REXML::Document
+                      xml_doc
+                  when REXML::Element
+                      doc = REXML::Document.new
+                      doc.add(xml_doc)
+                      doc
+                  when String
+                      REXML::Document.new(xml_doc)
+                  else
+                      raise ArgumentError, "Expected REXML::Document, REXML::Element, or String, got #{xml_doc.class}"
+                  end
+
+            if sdf_version.nil? && xml.root && xml.root.name == "sdf"
+                version_str = xml.root.attributes["version"]
+                if version_str
+                    sdf_version = (Float(version_str) * 100).to_i rescue nil
+                end
+            end
+
+            @gazebo_models[sdf_version] ||= {}
+            cache = (@gazebo_models[sdf_version][model_name] ||= ModelCacheEntry.new)
+            cache.path = "virtual://#{model_name}"
+            cache.xml = xml
+            cache.metadata = { "includes" => {}, "path" => cache.path }
+
+            # Also register under nil as a generic fallback
+            if sdf_version
+                @gazebo_models[nil] ||= {}
+                cache_nil = (@gazebo_models[nil][model_name] ||= ModelCacheEntry.new)
+                cache_nil.path = "virtual://#{model_name}"
+                cache_nil.xml = xml
+                cache_nil.metadata = { "includes" => {}, "path" => cache_nil.path }
+            end
+        end
+
+        # Checks if a model name is already cached in memory
+        #
+        # @param [String] model_name the target name
+        # @return [Boolean]
+        def self.cached_model?(model_name, sdf_version: nil)
+            # Check version-specific cache
+            if entry = @gazebo_models.dig(sdf_version, model_name)
+                return true if entry.xml
+            end
+            # Check fallback cache
+            if sdf_version && (entry = @gazebo_models.dig(nil, model_name))
+                return true if entry.xml
+            end
+            false
+        end
 
         # Finds the path to the SDF for a gazebo model and SDF version
         #
