@@ -161,11 +161,12 @@ module SDF
 
         ModelCacheEntry = Struct.new :path, :xml, :metadata
 
-        # Registers an in-memory XML model in the cache to avoid disk lookup
+        # Registers an already loaded in-memory XML model and its metadata in the cache
         #
         # @param [String] model_name the target name in the cache
         # @param [REXML::Document,REXML::Element,String] xml_doc the XML model representation
-        def self.register_in_memory_model(model_name, xml_doc, sdf_version: nil)
+        # @param [Hash,nil] metadata the pre-resolved include metadata
+        def self.register_in_memory_model(model_name, xml_doc, sdf_version: nil, metadata: nil)
             xml = case xml_doc
                   when REXML::Document
                       xml_doc
@@ -186,19 +187,24 @@ module SDF
                 end
             end
 
+            virtual_path = "virtual://#{model_name}"
+            metadata ||= {}
+            metadata["includes"] ||= {}
+            metadata["path"]     ||= virtual_path
+
             @gazebo_models[sdf_version] ||= {}
             cache = (@gazebo_models[sdf_version][model_name] ||= ModelCacheEntry.new)
-            cache.path = "virtual://#{model_name}"
-            cache.xml = xml
-            cache.metadata = { "includes" => {}, "path" => cache.path }
+            cache.path     = metadata["path"]
+            cache.xml      = xml
+            cache.metadata = metadata
 
             # Also register under nil as a generic fallback
             if sdf_version
                 @gazebo_models[nil] ||= {}
                 cache_nil = (@gazebo_models[nil][model_name] ||= ModelCacheEntry.new)
-                cache_nil.path = "virtual://#{model_name}"
-                cache_nil.xml = xml
-                cache_nil.metadata = { "includes" => {}, "path" => cache_nil.path }
+                cache_nil.path     = cache.path
+                cache_nil.xml      = xml
+                cache_nil.metadata = metadata
             end
         end
 
@@ -230,6 +236,14 @@ module SDF
             @gazebo_models[sdf_version] ||= {}
             cache = (@gazebo_models[sdf_version][model_name] ||= ModelCacheEntry.new)
             return cache.path if cache.path
+
+            # Fallback to the nil cache for virtual in-memory models
+            if sdf_version && (nil_cache = @gazebo_models.dig(nil, model_name)) && nil_cache.path && nil_cache.path.start_with?("virtual://")
+                cache.path = nil_cache.path
+                cache.xml = nil_cache.xml if nil_cache.xml
+                cache.metadata = nil_cache.metadata if nil_cache.metadata
+                return cache.path
+            end
 
             model_path.each do |p|
                 model_dir = File.join(p, model_name)
@@ -508,18 +522,24 @@ module SDF
         # @raise [NotSDF] if the file is not a SDF file
         # @raise [InvalidXML] if the file is not a valid XML file
         # @return [REXML::Element]
-        def self.load_sdf(sdf_file, flatten: true, metadata: false)
-            sdf = load_sdf_raw(sdf_file)
+        # Processes an in-memory SDF XML tree, resolving its include tags and relative URIs
+        #
+        # @param [REXML::Document] sdf the XML tree
+        # @param [Boolean] flatten flattens the XML model or not
+        # @param [Boolean] metadata returns a metadata hash or not
+        # @param [String,nil] path the file path or virtual path representing the SDF
+        # @return [REXML::Element, [REXML::Element, Hash]]
+        def self.resolve_sdf_xml(sdf, flatten: true, metadata: false, path: nil)
             sdf_version = sdf_version_of(sdf)
+            base_path = path ? File.dirname(path) : nil
 
-            sdf_metadata = Hash["includes" => {}, "path" => sdf_file]
-            includes = add_include_tags(sdf.root, sdf_version, File.dirname(sdf_file))
+            sdf_metadata = Hash["includes" => {}, "path" => path]
+            includes = add_include_tags(sdf.root, sdf_version, base_path)
             sdf_metadata["includes"].merge!(includes) do |_, old, new|
                 old + new
             end
-            resolve_relative_uris(sdf.root, sdf_version, File.dirname(sdf_file))
+            resolve_relative_uris(sdf.root, sdf_version, base_path)
 
-            sdf = deep_copy_xml(sdf)
             flatten_model_tree(sdf.root) if flatten
 
             if metadata
@@ -527,6 +547,15 @@ module SDF
             else
                 sdf
             end
+        end
+
+        # Loads a SDF file and returns the XML representation
+        #
+        # Unlike {.load_sdf_raw}, this resolves the include tags in the XML representation
+        def self.load_sdf(sdf_file, flatten: true, metadata: false)
+            sdf = load_sdf_raw(sdf_file)
+            sdf = deep_copy_xml(sdf)
+            resolve_sdf_xml(sdf, flatten: flatten, metadata: metadata, path: sdf_file)
         rescue Exception => e
             raise e, "while loading #{sdf_file}: #{e.message}", e.backtrace
         end

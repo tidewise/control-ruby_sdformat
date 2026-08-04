@@ -440,7 +440,7 @@ describe SDF::XML do
                 SDF::XML.register_in_memory_model("virtual_model", doc)
 
                 assert SDF::XML.cached_model?("virtual_model")
-                assert_equal doc, SDF::XML.model_from_name("virtual_model", flatten: false)
+                assert_equal doc.to_s, SDF::XML.model_from_name("virtual_model", flatten: false).to_s
             end
 
             it "allows registering a model as a REXML::Element" do
@@ -452,7 +452,7 @@ describe SDF::XML do
 
                 assert SDF::XML.cached_model?("virtual_el")
                 loaded = SDF::XML.model_from_name("virtual_el", flatten: false)
-                assert_equal element, loaded.root
+                assert_equal element.to_s, loaded.root.to_s
             end
 
             it "allows registering a model as a raw XML String" do
@@ -470,6 +470,38 @@ describe SDF::XML do
                 assert_raises(ArgumentError) do
                     SDF::XML.register_in_memory_model("invalid_model", 12_345)
                 end
+            end
+
+            it "falls back to the nil version cache if the requested version is not registered" do
+                doc = REXML::Document.new("<model name='virtual_fallback'/>")
+                # Register exclusively under nil (unversioned) cache by passing nil explicitly
+                SDF::XML.register_in_memory_model("virtual_fallback", doc, sdf_version: nil)
+
+                # Requesting with specific version 160 should fall back and load successfully
+                loaded = SDF::XML.model_from_name("virtual_fallback", 160, flatten: false)
+                assert_equal "virtual_fallback", loaded.root.attributes["name"]
+            end
+
+            it "resolves nested inclusions within in-memory models at registration time" do
+                submodel_doc = REXML::Document.new("<sdf version='1.6'><model name='sub'><link name='sub_link'/></model></sdf>")
+                SDF::XML.register_in_memory_model("submodel", submodel_doc)
+
+                # Register a parent model containing an include to the submodel
+                parent_doc = REXML::Document.new(
+                    "<sdf version='1.6'>" \
+                    "  <model name='parent'>" \
+                    "    <include><uri>model://submodel</uri><name>included_sub</name></include>" \
+                    "  </model>" \
+                    "</sdf>"
+                )
+                resolved_doc, metadata = SDF::XML.resolve_sdf_xml(parent_doc, flatten: false, metadata: true, path: "virtual://parent_model")
+                SDF::XML.register_in_memory_model("parent_model", resolved_doc, metadata: metadata)
+
+                # Retrieve with flatten: true (which requires all inclusions to be resolved)
+                loaded = SDF::XML.model_from_name("parent_model", flatten: true)
+
+                # Verify that the submodel's links are present in the flattened parent tree
+                assert loaded.elements["//link[@name='included_sub::sub_link']"]
             end
         end
         it "raises if the model cannot be found" do
