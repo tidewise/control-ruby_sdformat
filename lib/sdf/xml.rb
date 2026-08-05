@@ -212,7 +212,7 @@ module SDF
         #
         # @param [String] model_name the target name
         # @return [Boolean]
-        def self.cached_model?(model_name, sdf_version: nil)
+        def self.cached_model(model_name, sdf_version: nil)
             # Check version-specific cache
             if entry = @gazebo_models.dig(sdf_version, model_name)
                 return true if entry.xml

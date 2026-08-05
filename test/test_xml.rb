@@ -433,34 +433,34 @@ describe SDF::XML do
             end
 
             it "allows registering a model as a REXML::Document" do
-                refute SDF::XML.cached_model?("virtual_model")
+                refute SDF::XML.cached_model("virtual_model")
 
                 doc = REXML::Document.new("<model name='virtual'><link name='base'/></model>")
                 SDF::XML.register_in_memory_model("virtual_model", doc)
 
-                assert SDF::XML.cached_model?("virtual_model")
+                assert SDF::XML.cached_model("virtual_model")
                 assert_equal doc.to_s, SDF::XML.model_from_name("virtual_model", flatten: false).to_s
             end
 
             it "allows registering a model as a REXML::Element" do
-                refute SDF::XML.cached_model?("virtual_el")
+                refute SDF::XML.cached_model("virtual_el")
 
                 element = REXML::Element.new("model")
                 element.add_attribute("name", "virtual")
                 SDF::XML.register_in_memory_model("virtual_el", element)
 
-                assert SDF::XML.cached_model?("virtual_el")
+                assert SDF::XML.cached_model("virtual_el")
                 loaded = SDF::XML.model_from_name("virtual_el", flatten: false)
                 assert_equal element.to_s, loaded.root.to_s
             end
 
             it "allows registering a model as a raw XML String" do
-                refute SDF::XML.cached_model?("virtual_str")
+                refute SDF::XML.cached_model("virtual_str")
 
                 xml_string = "<model name='virtual'><link name='base'/></model>"
                 SDF::XML.register_in_memory_model("virtual_str", xml_string)
 
-                assert SDF::XML.cached_model?("virtual_str")
+                assert SDF::XML.cached_model("virtual_str")
                 loaded = SDF::XML.model_from_name("virtual_str", flatten: false)
                 assert_equal "virtual", loaded.root.attributes["name"]
             end
@@ -487,10 +487,10 @@ describe SDF::XML do
 
                 # Register a parent model containing an include to the submodel
                 parent_doc = REXML::Document.new(
-                    "<sdf version='1.6'>" \
-                    "  <model name='parent'>" \
-                    "    <include><uri>model://submodel</uri><name>included_sub</name></include>" \
-                    "  </model>" \
+                    "<sdf version='1.6'>  " \
+                    "<model name='parent'>    " \
+                    "<include><uri>model://submodel</uri><name>included_sub</name></include>  " \
+                    "</model>" \
                     "</sdf>"
                 )
                 resolved_doc, metadata = SDF::XML.resolve_sdf_xml(parent_doc, flatten: false, metadata: true, path: "virtual://parent_model")
