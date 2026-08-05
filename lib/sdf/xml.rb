@@ -40,10 +40,10 @@ module SDF
         #   search for models
         def self.model_path=(path)
             new_path = Array(path)
-            if @model_path != new_path
-                @model_path = new_path
-                clear_cache
-            end
+            return unless @model_path != new_path
+
+            @model_path = new_path
+            clear_cache
         end
 
         # load model_path with default parameters
@@ -183,7 +183,7 @@ module SDF
             if sdf_version.nil? && xml.root && xml.root.name == "sdf"
                 version_str = xml.root.attributes["version"]
                 if version_str
-                    sdf_version = (Float(version_str) * 100).to_i rescue nil
+                    sdf_version = Float(version_str, exception: false)&.then { |f| (f * 100).to_i }
                 end
             end
 
@@ -198,14 +198,14 @@ module SDF
             cache.xml      = xml
             cache.metadata = metadata
 
+            return unless sdf_version
+
             # Also register under nil as a generic fallback
-            if sdf_version
-                @gazebo_models[nil] ||= {}
-                cache_nil = (@gazebo_models[nil][model_name] ||= ModelCacheEntry.new)
-                cache_nil.path     = cache.path
-                cache_nil.xml      = xml
-                cache_nil.metadata = metadata
-            end
+            @gazebo_models[nil] ||= {}
+            cache_nil = (@gazebo_models[nil][model_name] ||= ModelCacheEntry.new)
+            cache_nil.path     = cache.path
+            cache_nil.xml      = xml
+            cache_nil.metadata = metadata
         end
 
         # Checks if a model name is already cached in memory
@@ -213,15 +213,10 @@ module SDF
         # @param [String] model_name the target name
         # @return [Boolean]
         def self.cached_model(model_name, sdf_version: nil)
-            # Check version-specific cache
-            if entry = @gazebo_models.dig(sdf_version, model_name)
-                return true if entry.xml
-            end
-            # Check fallback cache
-            if sdf_version && (entry = @gazebo_models.dig(nil, model_name))
-                return true if entry.xml
-            end
-            false
+            name = model_name[%r{^model://(\w+)}, 1] || model_name
+            [sdf_version, nil].uniq
+                              .filter_map { |version| @gazebo_models.dig(version, name) }
+                              .find(&:xml)
         end
 
         # Finds the path to the SDF for a gazebo model and SDF version
