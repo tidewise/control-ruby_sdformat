@@ -1,0 +1,69 @@
+# frozen_string_literal: true
+
+require "sdf/erb_loader"
+require "sdf/test"
+
+describe SDF::ERBLoader do
+    describe "#loads real file" do
+        before(:all) do
+            @models_dir = File.expand_path("data/models", __dir__)
+            @simple_model = File.join(@models_dir, "/simple_model_erb/model.sdf.erb")
+        end
+
+        it "loads a real .sdf.erb file with args" do
+            erb_args = {
+                links: [
+                    {
+                        name: "gps",
+                        pose: [0.0, 1.0, 2.0, 3.0, 4.0, 5.0]
+                    },
+                    {
+                        name: "gps2",
+                        pose: [6.0, 7.0, 8.0, 9.0, 0.0, 1.0]
+                    }
+                ]
+            }
+            loader = SDF::ERBLoader.new(erb_args: erb_args)
+
+            erb_content = loader.load_sdf_raw(@simple_model)
+
+            assert_equal "simple_model_erb",
+                         REXML::XPath.first(erb_content, "//model").attributes["name"]
+            poses = REXML::XPath.match(erb_content, "//pose").map(&:text)
+            assert_includes poses, "0.0 1.0 2.0 3.0 4.0 5.0"
+            assert_includes poses, "6.0 7.0 8.0 9.0 0.0 1.0"
+        end
+
+        it "loads a real .sdf.erb file without args" do
+            erb_content = SDF::ERBLoader.new.load_sdf_raw(@simple_model)
+
+            assert_equal "simple_model_erb",
+                         REXML::XPath.first(erb_content, "//model").attributes["name"]
+            poses = REXML::XPath.match(erb_content, "//pose").map(&:text)
+            assert_includes poses, "-0.679 0.0 1.92 0.0 0.0 0.0"
+            assert_includes poses, "2.571 0.044 0.808 0.0 0.0 0.0"
+        end
+
+        it "validates that the file is a XML file" do
+            assert_raises(SDF::XML::InvalidXML) do
+                SDF::ERBLoader.new.load_sdf_raw(File.join(@models_dir, "not_xml.xml"))
+            end
+        end
+        it "validates that the file has a root" do
+            assert_raises(SDF::XML::NotSDF) do
+                SDF::ERBLoader.new.load_sdf_raw(File.join(@models_dir, "no_root.xml"))
+            end
+        end
+        it "validates that the file is a SDF file" do
+            assert_raises(SDF::XML::NotSDF) do
+                SDF::ERBLoader.new.load_sdf_raw(File.join(@models_dir, "not_sdf.xml"))
+            end
+        end
+        it "validates that the file exists" do
+            assert_raises(Errno::ENOENT) do
+                SDF::ERBLoader.new.load_sdf_raw(File.join(@models_dir,
+                                                          "does_not_exist.xml"))
+            end
+        end
+    end
+end

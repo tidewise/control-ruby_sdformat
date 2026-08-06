@@ -1,6 +1,7 @@
 require "rexml/document"
 require_relative "exceptions"
 require_relative "sdf_loader"
+require_relative "erb_loader"
 
 module SDF
     module XML
@@ -112,7 +113,7 @@ module SDF
         #
         # @!macro sdf_version
         # @return [Hash<String,REXML::Element>]
-        def self.gazebo_models(sdf_version = nil, loader: SDF::Loader.new)
+        def self.gazebo_models(sdf_version = nil, loader: SDF::ERBLoader.new)
             @gazebo_models[sdf_version] ||= {}
             @model_path.each do |p|
                 Dir.glob(File.join(p, "*")) do |subdir|
@@ -442,7 +443,7 @@ module SDF
             sdf_version = sdf_version_of(sdf)
 
             sdf_metadata = Hash["includes" => {}, "path" => sdf_file]
-            includes = add_include_tags(sdf.root, sdf_version, File.dirname(sdf_file))
+            includes = add_include_tags(sdf.root, sdf_version, File.dirname(sdf_file), loader: loader)
             sdf_metadata["includes"].merge!(includes) do |_, old, new|
                 old + new
             end

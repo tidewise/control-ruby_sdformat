@@ -1,79 +1,9 @@
 # frozen_string_literal: true
 
+require "sdf/erb"
 require "sdf/test"
 
 describe SDF::ERB do
-    it "read_erb_file" do
-        template_path = File.expand_path("data/models/simple_model_erb/model.sdf.erb",
-                                         __dir__)
-
-        sdf_str = SDF::ERB.read_erb_file(template_path)
-
-        assert sdf_str
-
-        expected_sdf_str = <<~XML
-            <?xml version="1.0" ?>
-            <%
-           	    default_gps_pose = [-0.679, 0.0, 1.920, 0.0, 0.0, 0.0]
-               	default_gps2_pose = [2.571, 0.044, 0.808, 0.0, 0.0, 0.0]
-
-                gps1_pose = (defined?(links) && links.find { |link| link[:name] == "gps" }&.dig(:pose)) || default_gps_pose
-                gps2_pose = (defined?(links) && links.find { |link| link[:name] == "gps2" }&.dig(:pose)) || default_gps2_pose
-            %>
-            <sdf version="1.6">
-                <model name="simple_model_erb">
-                    <link name="root">
-                        <sensor name="g" type="gps" />
-                    </link>
-                    <link name="child" />
-                    <joint name="roo2child" type="revolute">
-                        <parent>root</parent>
-                        <child>child</child>
-                        <axis>
-                        </axis>
-                    </joint>
-
-                    <link name="gps">
-                        <pose><%= gps1_pose.join(' ') %></pose>
-                    </link>
-                    <joint name="gps_attachment" type="fixed">
-                        <parent>root</parent>
-                        <child>gps</child>
-                    </joint>
-
-                    <link name="gps2">
-                        <pose><%= gps2_pose.join(' ') %></pose>
-                    </link>
-                    <joint name="gps2_attachment" type="fixed">
-                        <parent>root</parent>
-                        <child>gps2</child>
-                    </joint>
-
-                    <plugin name="gps_test">
-                        <task model="rock_gazebo::GPSTask"/>
-                    </plugin>
-                </model>
-            </sdf>
-        XML
-
-        formatted_str = sdf_str.gsub(/\s+/, " ").strip
-        formatted_expected = expected_sdf_str.gsub(/\s+/, " ").strip
-
-        assert_equal(formatted_expected, formatted_str)
-    end
-
-    it "read_erb_file_wrong_extension" do
-        assert_raises(ArgumentError) do
-            SDF::ERB.read_erb_file("data/models/simple_model_erb/model.config")
-        end
-    end
-
-    it "read_erb_file_do_not_exist" do
-        assert_raises(ArgumentError) do
-            SDF::ERB.read_erb_file("/tmp/i_do_not_exist_i_hope.erb")
-        end
-    end
-
     it "parse_erb_as_str" do
         erb_content = <<~XML
             <?xml version="1.0" ?>
