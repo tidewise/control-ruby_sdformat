@@ -401,19 +401,6 @@ describe SDF::XML do
         end
     end
 
-    describe "load_sdf with a ERB templated model" do
-        it "loads SDF file fallbacks to ERB when model.sdf doesn't exist" do
-            sdf = SDF::XML.load_sdf_raw(File.join(models_dir, "simple_model_erb", "model.sdf"))
-            model = sdf.elements.enum_for(:each, "sdf/model").first
-            assert_equal("simple_model_erb", model.attributes["name"])
-        end
-        it "loads ERB templated file" do
-            sdf = SDF::XML.load_sdf_raw(File.join(models_dir, "simple_model_erb", "model.sdf.erb"))
-            model = sdf.elements.enum_for(:each, "sdf/model").first
-            assert_equal("simple_model_erb", model.attributes["name"])
-        end
-    end
-
     describe "model_from_name" do
         it "resolves and returns the raw model" do
             sdf = SDF::XML.model_from_name("simple_model")

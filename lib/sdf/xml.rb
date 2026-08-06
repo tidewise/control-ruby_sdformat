@@ -1,5 +1,6 @@
 require "rexml/document"
 require_relative "exceptions"
+require_relative "sdf_loader"
 
 module SDF
     module XML
@@ -7,24 +8,6 @@ module SDF
         #   @param [Integer,nil] sdf_version the maximum expected SDF version
         #     (as version * 100, i.e. version 1.5 is represented by 150). Leave to
         #     nil to always read the latest.
-
-        # Exception raised when trying to load a model URI, but the model does
-        # not contain a SDF entry for the required SDF version
-        class UnavailableSDFVersionInModel < ArgumentError; end
-        # Exception raised when trying to load a file that is not a SDF file
-        class NotSDF < ArgumentError; end
-        # Exception raised when trying to load a malformed XML file
-        class InvalidXML < ArgumentError; end
-
-        # Exception raised when trying to resolve a model that cannot be found
-        # in {model_path}
-        class NoSuchModel < ArgumentError
-            attr_reader :model_name
-
-            def initialize(model_name)
-                @model_name = model_name
-            end
-        end
 
         # The search path for models
         #
@@ -84,9 +67,9 @@ module SDF
         #   SDF file for the required SDF version
         #
         # @return [REXML::Element]
-        def self.load_gazebo_model(dir, sdf_version = nil, metadata: false, flatten: true)
+        def self.load_gazebo_model(dir, sdf_version = nil, metadata: false, flatten: true, loader: SDF::Loader.new)
             load_sdf(model_path_of(dir, sdf_version), metadata: metadata,
-                                                      flatten: flatten)
+                                                      flatten: flatten, loader: loader)
         end
 
         # Find model string into model.config path
@@ -129,7 +112,7 @@ module SDF
         #
         # @!macro sdf_version
         # @return [Hash<String,REXML::Element>]
-        def self.gazebo_models(sdf_version = nil)
+        def self.gazebo_models(sdf_version = nil, loader: SDF::Loader.new)
             @gazebo_models[sdf_version] ||= {}
             @model_path.each do |p|
                 Dir.glob(File.join(p, "*")) do |subdir|
@@ -141,7 +124,7 @@ module SDF
                         begin
                             sdf_file_path = model_path_of(subdir, sdf_version)
                             sdf, metadata = load_sdf(sdf_file_path, metadata: true,
-                                                                    flatten: false)
+                                                                    flatten: false, loader: loader)
                             @gazebo_models[sdf_version][File.basename(subdir)] =
                                 ModelCacheEntry.new(sdf_file_path, sdf, metadata)
                         rescue UnavailableSDFVersionInModel
@@ -194,12 +177,12 @@ module SDF
         #   model in {model_path}
         # @return [REXML::Element]
         def self.model_from_name(
-            model_name, sdf_version = nil, metadata: false, flatten: true
+            model_name, sdf_version = nil, metadata: false, flatten: true, loader: SDF::Loader.new
         )
             path = model_path_from_name(model_name, sdf_version: sdf_version)
             cache = @gazebo_models[sdf_version][model_name]
             unless cache.xml
-                cache.xml, cache.metadata = load_sdf(path, metadata: true, flatten: false)
+                cache.xml, cache.metadata = load_sdf(path, metadata: true, flatten: false, loader: loader)
             end
             xml = cache.xml
             if flatten
@@ -303,13 +286,13 @@ module SDF
         # @param [REXML::Element] elem element to find include tags
         # @!macro sdf_version
         # @return [void]
-        def self.add_include_tags(elem, sdf_version, base_path)
+        def self.add_include_tags(elem, sdf_version, base_path, loader: SDF::Loader.new)
             includes = {}
 
             replacements = []
             elem.elements.each do |inc|
                 if inc.name == "world" || inc.name == "model" # model-within-model
-                    added_includes = add_include_tags(inc, sdf_version, base_path)
+                    added_includes = add_include_tags(inc, sdf_version, base_path, loader: loader)
                     includes.merge! added_includes do |_, old, new|
                         old + new
                     end
@@ -345,11 +328,11 @@ module SDF
 
                     included_sdf, included_metadata =
                         model_from_name(model_name, sdf_version, metadata: true,
-                                                                 flatten: false)
+                                                                 flatten: false, loader: loader)
                 elsif File.directory?(uri_path = File.expand_path(uri, base_path))
                     included_sdf, included_metadata =
                         load_gazebo_model(uri_path, sdf_version, metadata: true,
-                                                                 flatten: false)
+                                                                 flatten: false, loader: loader)
                 else
                     raise ArgumentError,
                           "URI #{uri} is neither a model:// URI nor an existing directory"
@@ -398,53 +381,6 @@ module SDF
             includes
         end
 
-        # Open a SDF file and returns the XML representation
-        #
-        # Unlike {.load_sdf}, this really only loads the XML information, not
-        # resolving the include tags.
-        #
-        # @param [String] sdf_file the path to the SDF file
-        # @raise [Errno::ENOENT] if the files does not exist
-        # @raise [NotSDF] if the file is not a SDF file
-        # @raise [InvalidXML] if the file is not a valid XML file
-        # @raise [NoSuchModel] if cannot opend sdf_file nor a erb templated sdf_file
-        # @return [REXML::Element]
-        def self.load_sdf_raw(sdf_file)
-            erb_file = sdf_file.end_with?(".erb") ? sdf_file : "#{sdf_file}.erb"
-
-            unless File.exist?(sdf_file) || File.exist?(erb_file)
-                file_name  = File.basename(sdf_file)
-                dir_path   = File.dirname(sdf_file)
-                raise Errno::ENOENT,
-                      "Cannot find '#{file_name}' or '#{file_name}.erb' in '#{dir_path}'. " \
-                      "You probably want to update the GAZEBO_MODEL_PATH environment variable, " \
-                      "or set SDF.model_path explicitly."
-            end
-
-            begin
-                sdf = if File.exist?(sdf_file) && !sdf_file.end_with?(".erb")
-                          File.open(sdf_file) { |io| REXML::Document.new(io) }
-                      else
-                          REXML::Document.new(SDF::ERB.parse_erb_as_str(SDF::ERB.read_erb_file(erb_file)))
-                      end
-            rescue REXML::ParseException => e
-                unless e.message.include?("No root")
-                    raise InvalidXML, "Cannot load #{sdf_file}: #{e.message}"
-                end
-
-                sdf = REXML::Document.new
-            end
-
-            unless sdf.root
-                raise NotSDF, "#{sdf_file} can be parsed as an XML file, but it does not have a root"
-            end
-            unless %w[sdf gazebo].include?(sdf.root.name)
-                raise NotSDF, "#{sdf_file} is not a SDF file"
-            end
-
-            sdf
-        end
-
         # Get sdf_version
         #
         # @param [REXML::Element] sdf element
@@ -491,6 +427,9 @@ module SDF
         # @param [Boolean] metadata whether the method should return a metadata hash
         #   about the various inclusions that have been performed. See above for
         #   the hash format
+        # @param [#load_sdf_raw] loader object that acts as a loader.Takes a file path as input
+        # and returns a REXML::Element with its content. Must respond to
+        # `load_sdf_raw(path: String) -> REXML::Element`
         # @return [REXML::Element,(REXML::Element,Hash)] either the XML tree by itself
         #   if `metadata` is false, or the pair of the tree and the metadata hash
         #   otherwise.
@@ -498,8 +437,8 @@ module SDF
         # @raise [NotSDF] if the file is not a SDF file
         # @raise [InvalidXML] if the file is not a valid XML file
         # @return [REXML::Element]
-        def self.load_sdf(sdf_file, flatten: true, metadata: false)
-            sdf = load_sdf_raw(sdf_file)
+        def self.load_sdf(sdf_file, flatten: true, metadata: false, loader: SDF::Loader.new)
+            sdf = loader.load_sdf_raw(sdf_file)
             sdf_version = sdf_version_of(sdf)
 
             sdf_metadata = Hash["includes" => {}, "path" => sdf_file]

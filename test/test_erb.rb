@@ -1,6 +1,6 @@
 # frozen_string_literal: true
 
-require "sdf/erb"
+require "sdf/test"
 
 describe SDF::ERB do
     it "read_erb_file" do
@@ -14,10 +14,11 @@ describe SDF::ERB do
         expected_sdf_str = <<~XML
             <?xml version="1.0" ?>
             <%
-                default_gps_pose = [-0.679, 0.0, 1.920, 0.0, 0.0, 0.0]
-                default_gps2_pose = [2.571, 0.044, 0.808, 0.0, 0.0, 0.0]
-                gps1_pose = (defined?(gps_sensors) && gps_sensors.dig(:gps, :pose)) || default_gps_pose
-                gps2_pose = (defined?(gps_sensors) && gps_sensors.dig(:gps2, :pose)) || default_gps2_pose
+           	    default_gps_pose = [-0.679, 0.0, 1.920, 0.0, 0.0, 0.0]
+               	default_gps2_pose = [2.571, 0.044, 0.808, 0.0, 0.0, 0.0]
+
+                gps1_pose = (defined?(links) && links.find { |link| link[:name] == "gps" }&.dig(:pose)) || default_gps_pose
+                gps2_pose = (defined?(links) && links.find { |link| link[:name] == "gps2" }&.dig(:pose)) || default_gps2_pose
             %>
             <sdf version="1.6">
                 <model name="simple_model_erb">
@@ -47,6 +48,10 @@ describe SDF::ERB do
                         <parent>root</parent>
                         <child>gps2</child>
                     </joint>
+
+                    <plugin name="gps_test">
+                        <task model="rock_gazebo::GPSTask"/>
+                    </plugin>
                 </model>
             </sdf>
         XML

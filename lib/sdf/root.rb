@@ -28,12 +28,12 @@ module SDF
         # @raise [XML::NotSDF] if the file is not a SDF file
         # @raise [XML::InvalidXML] if the file is not a valid XML file
         # @return [Root]
-        def self.load(sdf_file, expected_sdf_version = nil, flatten: true)
+        def self.load(sdf_file, expected_sdf_version = nil, flatten: true, loader: SDF::Loader.new)
             if sdf_file =~ %r{^model://(.*)}
                 load_from_model_name(::Regexp.last_match(1), expected_sdf_version,
-                                     flatten: flatten)
+                                     flatten: flatten, loader: loader)
             else
-                xml, metadata = XML.load_sdf(sdf_file, flatten: flatten, metadata: true)
+                xml, metadata = XML.load_sdf(sdf_file, flatten: flatten, metadata: true, loader: loader)
                 new(xml.root, metadata)
             end
         end
@@ -48,9 +48,9 @@ module SDF
         #   (as version * 100, i.e. version 1.5 is represented by 150). Leave to
         #   nil to always read the latest.
         # @return [Root]
-        def self.load_from_model_name(model_name, sdf_version = nil, flatten: true)
+        def self.load_from_model_name(model_name, sdf_version = nil, flatten: true, loader: SDF::Loader.new)
             xml, metadata = XML.model_from_name(model_name, sdf_version,
-                                                flatten: flatten, metadata: true)
+                                                flatten: flatten, metadata: true, loader: loader)
             new(xml.root, metadata)
         end
 
