@@ -42,5 +42,15 @@ module SDF
             # Render the ERB template with the passed hash arguments
             erb_engine.result_with_hash(erb_args)
         end
+
+        # Renders an ERB template and returns it as a REXML::Document
+        #
+        # @return [REXML::Document] the rendered sdf model
+        def render_erb_sdf_model(path, **erb_args)
+            erb_content = read_erb_file(path)
+            solved_erb_as_sdf_str = parse_erb_as_str(erb_content, **erb_args)
+
+            REXML::Document.new(solved_erb_as_sdf_str)
+        end
     end
 end
