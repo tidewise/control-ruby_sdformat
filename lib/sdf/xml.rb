@@ -1,5 +1,5 @@
 require "rexml/document"
-require_relative "erb"
+require_relative "exceptions"
 
 module SDF
     module XML
