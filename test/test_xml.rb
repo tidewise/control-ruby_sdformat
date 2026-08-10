@@ -96,7 +96,7 @@ describe SDF::XML do
             end
         end
         it "validates that the file has a root" do
-            assert_raises(SDF::XML::NotSDF) do
+            assert_raises(SDF::XML::InvalidXML) do
                 SDF::XML.load_sdf(File.join(models_dir, "no_root.xml"))
             end
         end

@@ -1,7 +1,7 @@
 require "rexml/document"
-require_relative "exceptions"
-require_relative "sdf_loader"
-require_relative "erb_loader"
+require "sdf/exceptions"
+require "sdf/loader"
+require "sdf/erb_loader"
 
 module SDF
     module XML

@@ -1,6 +1,6 @@
 # frozen_string_literal: true
 
-require "sdf/sdf_loader"
+require "sdf/loader"
 require "sdf/test"
 
 describe SDF::Loader do
