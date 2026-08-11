@@ -5,6 +5,10 @@ require "sdf/erb_loader"
 
 module SDF
     module XML
+        class << self
+            attr_accessor :default_loader
+        end
+
         # @!macro [new] sdf_version
         #   @param [Integer,nil] sdf_version the maximum expected SDF version
         #     (as version * 100, i.e. version 1.5 is represented by 150). Leave to
@@ -32,6 +36,7 @@ module SDF
         def self.initialize
             @model_path = (ENV["GAZEBO_MODEL_PATH"] || "").split(":")
             @model_path << File.join(Dir.home, ".gazebo", "models")
+            @default_loader = SDF::ERBLoader.new
         end
 
         initialize
@@ -68,9 +73,9 @@ module SDF
         #   SDF file for the required SDF version
         #
         # @return [REXML::Element]
-        def self.load_gazebo_model(dir, sdf_version = nil, metadata: false, flatten: true, loader: SDF::Loader.new)
+        def self.load_gazebo_model(dir, sdf_version = nil, metadata: false, flatten: true)
             load_sdf(model_path_of(dir, sdf_version), metadata: metadata,
-                                                      flatten: flatten, loader: loader)
+                                                      flatten: flatten)
         end
 
         # Find model string into model.config path
@@ -113,7 +118,7 @@ module SDF
         #
         # @!macro sdf_version
         # @return [Hash<String,REXML::Element>]
-        def self.gazebo_models(sdf_version = nil, loader: SDF::ERBLoader.new)
+        def self.gazebo_models(sdf_version = nil)
             @gazebo_models[sdf_version] ||= {}
             @model_path.each do |p|
                 Dir.glob(File.join(p, "*")) do |subdir|
@@ -125,7 +130,7 @@ module SDF
                         begin
                             sdf_file_path = model_path_of(subdir, sdf_version)
                             sdf, metadata = load_sdf(sdf_file_path, metadata: true,
-                                                                    flatten: false, loader: loader)
+                                                                    flatten: false)
                             @gazebo_models[sdf_version][File.basename(subdir)] =
                                 ModelCacheEntry.new(sdf_file_path, sdf, metadata)
                         rescue UnavailableSDFVersionInModel
@@ -178,12 +183,12 @@ module SDF
         #   model in {model_path}
         # @return [REXML::Element]
         def self.model_from_name(
-            model_name, sdf_version = nil, metadata: false, flatten: true, loader: SDF::Loader.new
+            model_name, sdf_version = nil, metadata: false, flatten: true
         )
             path = model_path_from_name(model_name, sdf_version: sdf_version)
             cache = @gazebo_models[sdf_version][model_name]
             unless cache.xml
-                cache.xml, cache.metadata = load_sdf(path, metadata: true, flatten: false, loader: loader)
+                cache.xml, cache.metadata = load_sdf(path, metadata: true, flatten: false)
             end
             xml = cache.xml
             if flatten
@@ -287,13 +292,13 @@ module SDF
         # @param [REXML::Element] elem element to find include tags
         # @!macro sdf_version
         # @return [void]
-        def self.add_include_tags(elem, sdf_version, base_path, loader: SDF::Loader.new)
+        def self.add_include_tags(elem, sdf_version, base_path)
             includes = {}
 
             replacements = []
             elem.elements.each do |inc|
                 if inc.name == "world" || inc.name == "model" # model-within-model
-                    added_includes = add_include_tags(inc, sdf_version, base_path, loader: loader)
+                    added_includes = add_include_tags(inc, sdf_version, base_path)
                     includes.merge! added_includes do |_, old, new|
                         old + new
                     end
@@ -329,11 +334,11 @@ module SDF
 
                     included_sdf, included_metadata =
                         model_from_name(model_name, sdf_version, metadata: true,
-                                                                 flatten: false, loader: loader)
+                                                                 flatten: false)
                 elsif File.directory?(uri_path = File.expand_path(uri, base_path))
                     included_sdf, included_metadata =
                         load_gazebo_model(uri_path, sdf_version, metadata: true,
-                                                                 flatten: false, loader: loader)
+                                                                 flatten: false)
                 else
                     raise ArgumentError,
                           "URI #{uri} is neither a model:// URI nor an existing directory"
@@ -438,12 +443,12 @@ module SDF
         # @raise [NotSDF] if the file is not a SDF file
         # @raise [InvalidXML] if the file is not a valid XML file
         # @return [REXML::Element]
-        def self.load_sdf(sdf_file, flatten: true, metadata: false, loader: SDF::Loader.new)
-            sdf = loader.load_sdf_raw(sdf_file)
+        def self.load_sdf(sdf_file, flatten: true, metadata: false)
+            sdf = @default_loader.load_sdf_raw(sdf_file)
             sdf_version = sdf_version_of(sdf)
 
             sdf_metadata = Hash["includes" => {}, "path" => sdf_file]
-            includes = add_include_tags(sdf.root, sdf_version, File.dirname(sdf_file), loader: loader)
+            includes = add_include_tags(sdf.root, sdf_version, File.dirname(sdf_file))
             sdf_metadata["includes"].merge!(includes) do |_, old, new|
                 old + new
             end
