@@ -23,9 +23,10 @@ module SDF
                 xml_string = erb_engine.result_with_hash(@erb_args)
             end
             sdf = REXML::Document.new(xml_string)
-            validate_sdf_root(sdf, sdf_file)
 
-            sdf
+            return sdf if sdf.root.name == "sdf"
+
+            raise SDF::XML::NotSDF, "#{sdf_file} is not a SDF file"
         rescue REXML::ParseException => e
             error_message = "Cannot load #{sdf_file}: #{e.message}"
 
@@ -35,14 +36,6 @@ module SDF
             end
 
             raise SDF::XML::InvalidXML, error_message
-        end
-
-        private
-
-        def validate_sdf_root(sdf, sdf_file)
-            return if sdf.root.name == "sdf"
-
-            raise SDF::XML::NotSDF, "#{sdf_file} is not a SDF file"
         end
     end
 end
