@@ -1,7 +1,6 @@
 require "rexml/document"
 require "sdf/exceptions"
 require "sdf/loader"
-require "sdf/erb_loader"
 
 module SDF
     module XML
@@ -36,7 +35,7 @@ module SDF
         def self.initialize
             @model_path = (ENV["GAZEBO_MODEL_PATH"] || "").split(":")
             @model_path << File.join(Dir.home, ".gazebo", "models")
-            @default_loader = SDF::ERBLoader.new
+            @default_loader = SDF::Loader.new
         end
 
         initialize

@@ -17,7 +17,6 @@ require "sdf/plugin"
 require "sdf/sensor"
 require "sdf/frame"
 require "sdf/loader"
-require "sdf/erb_loader"
 
 # The toplevel namespace for sdf
 #
