@@ -1,6 +1,7 @@
 # frozen_string_literal: true
 
 require "erb"
+require "sdf/erb_context"
 
 module SDF
     # class to load SDF and ERB templated SDF files
@@ -19,8 +20,10 @@ module SDF
         def load_sdf_raw(sdf_file)
             xml_string = File.read(sdf_file)
             if sdf_file.end_with?(".sdf.erb")
-                erb_engine = ::ERB.new(xml_string, trim_mode: "-")
-                xml_string = erb_engine.result_with_hash(@erb_args)
+                erb_context = SDF::ERBContext.new(args: @erb_args)
+                xml_string = ::ERB.new(xml_string, trim_mode: "-").result(
+                    erb_context.instance_eval { ::Kernel.binding }
+                )
             end
             sdf = REXML::Document.new(xml_string)
 

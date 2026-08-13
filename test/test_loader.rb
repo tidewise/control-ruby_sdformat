@@ -3,6 +3,8 @@
 require "sdf/loader"
 require "sdf/test"
 
+SDFPoseParameter = Struct.new :name, :pose, keyword_init: true
+
 describe SDF::Loader do
     it "fallback from .sdf to .sdf.erb and loads file without model and args" do
         loader = SDF::Loader.new
@@ -24,15 +26,15 @@ describe SDF::Loader do
 
         it "loads a real .sdf.erb file with args" do
             erb_args = {
-                links: [
-                    {
+                poses: [
+                    SDFPoseParameter.new(
                         name: "gps",
                         pose: [0.0, 1.0, 2.0, 3.0, 4.0, 5.0]
-                    },
-                    {
+                    ),
+                    SDFPoseParameter.new(
                         name: "gps2",
                         pose: [6.0, 7.0, 8.0, 9.0, 0.0, 1.0]
-                    }
+                    )
                 ]
             }
             loader = SDF::Loader.new(erb_args: erb_args)
@@ -48,15 +50,15 @@ describe SDF::Loader do
 
         it "InvalidXML when loading erb file with .sdf extension" do
             erb_args = {
-                links: [
-                    {
+                poses: [
+                    SDFPoseParameter.new(
                         name: "gps",
                         pose: [0.0, 1.0, 2.0, 3.0, 4.0, 5.0]
-                    },
-                    {
+                    ),
+                    SDFPoseParameter.new(
                         name: "gps2",
                         pose: [6.0, 7.0, 8.0, 9.0, 0.0, 1.0]
-                    }
+                    )
                 ]
             }
             loader = SDF::Loader.new(erb_args: erb_args)
