@@ -37,14 +37,11 @@ module SDF
             return true if ERBContext.method_defined?(sym)
             return true if include_all && ERBContext.private_method_defined?(sym)
 
-            respond_to_missing?(method_name, include_all)
+            @args.key?(method_name.to_sym)
         end
         # rubocop:enable Style/OptionalBooleanParameter
 
-        def respond_to_missing?(method_name, _include_all = false)
-            @args.key?(method_name.to_sym)
-        end
-
+        # rubocop:disable Style/MissingRespondToMissing
         def method_missing(method_name, *)
             if @args.key?(method_name)
                 val = @args[method_name]
@@ -54,5 +51,6 @@ module SDF
                 "no ERB argument available named '#{method_name}'"
             )
         end
+        # rubocop:enable Style/MissingRespondToMissing
     end
 end

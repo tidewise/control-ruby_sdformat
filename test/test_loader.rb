@@ -25,19 +25,15 @@ describe SDF::Loader do
         end
 
         it "loads a real .sdf.erb file with args" do
-            erb_args = {
-                poses: [
-                    SDFPoseParameter.new(
-                        name: "gps",
-                        pose: [0.0, 1.0, 2.0, 3.0, 4.0, 5.0]
-                    ),
-                    SDFPoseParameter.new(
-                        name: "gps2",
-                        pose: [6.0, 7.0, 8.0, 9.0, 0.0, 1.0]
-                    )
-                ]
+            gps_pose = [0.0, 1.0, 2.0, 3.0, 4.0, 5.0]
+            gps2_pose = [6.0, 7.0, 8.0, 9.0, 0.0, 1.0]
+            poses = {
+                poses: {
+                    gps: gps_pose,
+                    gps2: gps2_pose
+                }
             }
-            loader = SDF::Loader.new(erb_args: erb_args)
+            loader = SDF::Loader.new(erb_args: poses)
 
             erb_content = loader.load_sdf_raw(@simple_model)
 
@@ -49,19 +45,15 @@ describe SDF::Loader do
         end
 
         it "InvalidXML when loading erb file with .sdf extension" do
-            erb_args = {
-                poses: [
-                    SDFPoseParameter.new(
-                        name: "gps",
-                        pose: [0.0, 1.0, 2.0, 3.0, 4.0, 5.0]
-                    ),
-                    SDFPoseParameter.new(
-                        name: "gps2",
-                        pose: [6.0, 7.0, 8.0, 9.0, 0.0, 1.0]
-                    )
-                ]
+            gps_pose = [0.0, 1.0, 2.0, 3.0, 4.0, 5.0]
+            gps2_pose = [6.0, 7.0, 8.0, 9.0, 0.0, 1.0]
+            poses = {
+                poses: {
+                    gps: gps_pose,
+                    gps2: gps2_pose
+                }
             }
-            loader = SDF::Loader.new(erb_args: erb_args)
+            loader = SDF::Loader.new(erb_args: poses)
 
             invalid_models_dir = File.expand_path("data/invalid_models", __dir__)
             invalid_model = File.join(
