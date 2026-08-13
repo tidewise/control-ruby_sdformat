@@ -4,8 +4,6 @@ require "erb"
 require "sdf/erb_context"
 require "sdf/test"
 
-SDFPoseParameter = Struct.new :name, :pose, keyword_init: true
-
 describe SDF::ERBContext do
     it "ERBContext makes keys available falling back to missing_methods" do
         gps_pose = [1.0, 2.0, 3.0, 0.0, 0.0, 0.0]

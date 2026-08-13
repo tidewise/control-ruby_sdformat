@@ -3,10 +3,8 @@
 require "sdf/loader"
 require "sdf/test"
 
-SDFPoseParameter = Struct.new :name, :pose, keyword_init: true
-
 describe SDF::Loader do
-    it "fallback from .sdf to .sdf.erb and loads file without model and args" do
+    it "loads sdf model correctly" do
         loader = SDF::Loader.new
 
         sdf_file_path = File.expand_path(
