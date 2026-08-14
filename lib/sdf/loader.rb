@@ -10,7 +10,7 @@ module SDF
             @erb_args = erb_args
         end
 
-        # Open a SDF file SDF file and returns its XML representation.
+        # Open a SDF file and returns its XML representation.
         #
         # @param [String] sdf_file the path to the SDF file
         # @raise [Errno::ENOENT] if the files does not exist
