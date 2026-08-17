@@ -1,29 +1,17 @@
 require "rexml/document"
+require "sdf/exceptions"
+require "sdf/loader"
 
 module SDF
     module XML
+        class << self
+            attr_accessor :default_loader
+        end
+
         # @!macro [new] sdf_version
         #   @param [Integer,nil] sdf_version the maximum expected SDF version
         #     (as version * 100, i.e. version 1.5 is represented by 150). Leave to
         #     nil to always read the latest.
-
-        # Exception raised when trying to load a model URI, but the model does
-        # not contain a SDF entry for the required SDF version
-        class UnavailableSDFVersionInModel < ArgumentError; end
-        # Exception raised when trying to load a file that is not a SDF file
-        class NotSDF < ArgumentError; end
-        # Exception raised when trying to load a malformed XML file
-        class InvalidXML < ArgumentError; end
-
-        # Exception raised when trying to resolve a model that cannot be found
-        # in {model_path}
-        class NoSuchModel < ArgumentError
-            attr_reader :model_name
-
-            def initialize(model_name)
-                @model_name = model_name
-            end
-        end
 
         # The search path for models
         #
@@ -47,6 +35,7 @@ module SDF
         def self.initialize
             @model_path = (ENV["GAZEBO_MODEL_PATH"] || "").split(":")
             @model_path << File.join(Dir.home, ".gazebo", "models")
+            @default_loader = SDF::Loader.new
         end
 
         initialize
@@ -165,7 +154,7 @@ module SDF
         # @raise (see model_path_of)
         # @raise [NoSuchModel] if the provided model name does not resolve to a
         #   model in {model_path}
-        # @return [REXML::Element]
+        # @return [String] the path to the SDF file for the model
         def self.model_path_from_name(model_name, model_path: @model_path, sdf_version: nil)
             @gazebo_models[sdf_version] ||= {}
             cache = (@gazebo_models[sdf_version][model_name] ||= ModelCacheEntry.new)
@@ -213,6 +202,23 @@ module SDF
             end
         end
 
+        # Resolves relative paths and model:// URIs in the XML tree in-place
+        #
+        # This method traverses the XML tree starting from the given node, and
+        # expands any relative paths or `model://` URIs inside `<uri>` tags to
+        # absolute paths on the local filesystem.
+        #
+        # It skips `<include>` tags because those are resolved separately during
+        # {.add_include_tags}.
+        #
+        # @example Replaces a model:// mesh path:
+        #   # Before: <uri>model://robot_model/hull.dae</uri>
+        #   # After:  <uri>/path/to/workspace/robot_models/models/sdf/robot_model/hull.dae</uri>
+        #
+        # @param [REXML::Element] node the XML element to traverse
+        # @!macro sdf_version
+        # @param [String] base_path the base directory path used to resolve relative paths
+        # @return [void]
         def self.resolve_relative_uris(node, sdf_version, base_path)
             nodes = [node]
             until nodes.empty?
@@ -263,6 +269,24 @@ module SDF
         #
         # This method modifies the XML tree by replacing the include tags found
         # as direct children of the provided element by the included content.
+        #
+        # @example
+        #   # Before calling add_include_tags:
+        #   # <world name="my_world">
+        #   #   <include>
+        #   #     <uri>model://my_sensor</uri>
+        #   #     <name>custom_sensor</name>
+        #   #     <pose>1 0 0 0 0 0</pose>
+        #   #   </include>
+        #   # </world>
+        #   #
+        #   # After calling add_include_tags:
+        #   # <world name="my_world">
+        #   #   <model name="custom_sensor">
+        #   #     <pose>1 0 0 0 0 0</pose>
+        #   #     <link name="sensor_link">...</link>
+        #   #   </model>
+        #   # </world>
         #
         # @param [REXML::Element] elem element to find include tags
         # @!macro sdf_version
@@ -362,39 +386,6 @@ module SDF
             includes
         end
 
-        # Open a SDF file and returns the XML representation
-        #
-        # Unlike {.load_sdf}, this really only loads the XML information, not
-        # resolving the include tags.
-        #
-        # @param [String] sdf_file the path to the SDF file
-        # @raise [Errno::ENOENT] if the files does not exist
-        # @raise [NotSDF] if the file is not a SDF file
-        # @raise [InvalidXML] if the file is not a valid XML file
-        # @return [REXML::Element]
-        def self.load_sdf_raw(sdf_file)
-            sdf = File.open(sdf_file) do |io|
-                REXML::Document.new(io)
-            rescue REXML::ParseException => e
-                unless e.message.match?(/No root/)
-                    raise InvalidXML, "cannot load #{sdf_file}: #{e.message}"
-                end
-
-                REXML::Document.new
-            end
-
-            unless sdf.root
-                raise NotSDF,
-                      "#{sdf_file} can be parsed as an XML file, but it does not have a root"
-            end
-
-            if sdf.root.name != "sdf" && sdf.root.name != "gazebo"
-                raise NotSDF, "#{sdf_file} is not a SDF file"
-            end
-
-            sdf
-        end
-
         # Get sdf_version
         #
         # @param [REXML::Element] sdf element
@@ -441,6 +432,9 @@ module SDF
         # @param [Boolean] metadata whether the method should return a metadata hash
         #   about the various inclusions that have been performed. See above for
         #   the hash format
+        # @param [#load_sdf_raw] loader object that acts as a loader.Takes a file path as input
+        # and returns a REXML::Element with its content. Must respond to
+        # `load_sdf_raw(path: String) -> REXML::Element`
         # @return [REXML::Element,(REXML::Element,Hash)] either the XML tree by itself
         #   if `metadata` is false, or the pair of the tree and the metadata hash
         #   otherwise.
@@ -449,7 +443,7 @@ module SDF
         # @raise [InvalidXML] if the file is not a valid XML file
         # @return [REXML::Element]
         def self.load_sdf(sdf_file, flatten: true, metadata: false)
-            sdf = load_sdf_raw(sdf_file)
+            sdf = @default_loader.load_sdf_raw(sdf_file)
             sdf_version = sdf_version_of(sdf)
 
             sdf_metadata = Hash["includes" => {}, "path" => sdf_file]

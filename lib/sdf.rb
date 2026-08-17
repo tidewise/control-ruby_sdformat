@@ -16,6 +16,7 @@ require "sdf/axis_limit"
 require "sdf/plugin"
 require "sdf/sensor"
 require "sdf/frame"
+require "sdf/loader"
 
 # The toplevel namespace for sdf
 #
