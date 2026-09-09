@@ -19,7 +19,7 @@ module SDF
         # @return [REXML::Element] sdf_file's content as a REXML::Element instance
         def load_sdf_raw(sdf_file)
             xml_string = File.read(sdf_file)
-            if sdf_file.end_with?(".sdf.erb")
+            if sdf_file.end_with?(".sdf.erb", ".world.erb")
                 erb_context = SDF::ERBContext.new(args: @erb_args)
                 xml_string = ::ERB.new(xml_string, trim_mode: "-").result(
                     erb_context.instance_eval { ::Kernel.binding }
